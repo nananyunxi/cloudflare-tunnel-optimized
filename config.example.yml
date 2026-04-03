@@ -1,0 +1,38 @@
+# Cloudflare Tunnel 配置文件示例
+# 将此文件复制到 ~/.cloudflared/config.yml 并根据需要修改
+
+# 隧道名称或 ID
+tunnel: your-tunnel-name
+
+# 凭证文件路径 (创建隧道后自动生成)
+credentials-file: ~/.cloudflared/your-tunnel-id.json
+
+# 入口规则配置
+ingress:
+  # Web 应用
+  - hostname: web.yourdomain.com
+    service: http://localhost:8080
+    originRequest:
+      # 连接超时时间
+      connectTimeout: 30s
+      # TCP 保活时间
+      tcpKeepAlive: 30s
+      # 禁用 TLS 验证 (开发环境)
+      noTLSVerify: true
+      # HTTP/2 支持
+      http2Origin: true
+
+  # API 服务
+  - hostname: api.yourdomain.com
+    service: http://localhost:3000
+
+  # SSH 访问 (需要配置 Cloudflare Access)
+  - hostname: ssh.yourdomain.com
+    service: ssh://localhost:22
+
+  # 远程桌面 (需要配置 Cloudflare Access)
+  - hostname: rdp.yourdomain.com
+    service: rdp://localhost:3389
+
+  # 默认规则 (必须放在最后)
+  - service: http_status:404

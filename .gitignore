@@ -1,0 +1,20 @@
+# 忽略系统文件
+.DS_Store
+Thumbs.db
+
+# 忽略日志文件
+logs/
+*.log
+
+# 忽略凭证文件 (敏感信息)
+*.json
+*.pem
+cert.pem
+
+# 忽略 PID 文件
+*.pid
+
+# 忽略临时文件
+tmp/
+temp/
+*.tmp
