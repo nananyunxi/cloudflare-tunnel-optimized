@@ -17,9 +17,14 @@ from urllib.parse import urlparse
 PORT = int(os.environ.get('MONITOR_PORT', '9090'))
 LOG_DIR = os.path.expanduser('~/.cloudflared/logs')
 PID_FILE = os.path.expanduser('~/.cloudflared/tunnel.pid')
+TUNNEL_URL_FILE = os.path.expanduser('~/.cloudflared/tunnel_url.txt')
 
 def get_status():
     """获取隧道状态"""
+    if os.path.exists(PID_FILE):
+        try:
+            with open(PID_FILE, 'r') as f:
+                pid = int(f.read().strip())
     if os.path.exists(PID_FILE):
         try:
             with open(PID_FILE, 'r') as f:
@@ -45,6 +50,17 @@ def get_status():
 
 def get_tunnel_url():
     """获取隧道 URL"""
+    # 首先尝试从保存的 URL 文件读取
+    if os.path.exists(TUNNEL_URL_FILE):
+        try:
+            with open(TUNNEL_URL_FILE, 'r') as f:
+                url = f.read().strip()
+            if url:
+                return url
+        except:
+            pass
+    
+    # 其次尝试从日志文件读取
     log_file = os.path.join(LOG_DIR, 'tunnel-output.log')
     if os.path.exists(log_file):
         try:
@@ -56,7 +72,7 @@ def get_tunnel_url():
                 return match.group(0)
         except:
             pass
-    return None
+    return "暂无链接"
 
 def get_local_port():
     """获取本地端口"""
