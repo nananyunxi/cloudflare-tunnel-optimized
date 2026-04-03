@@ -322,6 +322,11 @@ main() {
     nohup python3 "$SCRIPT_DIR/monitor.py" > "$LOG_DIR/monitor.log" 2>&1 &
     sleep 2
     
+    # 启动自动更新检查
+    echo -e "${CYAN}正在启动自动更新检查...${NC}"
+    nohup "$SCRIPT_DIR/auto-update.sh" > "$LOG_DIR/update.log" 2>&1 &
+    sleep 2
+    
     echo ""
     echo -e "${BLUE}══════════════════════════════════════════════════════${NC}"
     echo -e "${GREEN}✅ 所有服务已启动！${NC}"
@@ -331,6 +336,7 @@ main() {
     echo -e "   1. Cloudflare Tunnel 隧道      ✅ 运行中"
     echo -e "   2. 自动重连守护进程            ✅ 运行中"
     echo -e "   3. Web 监控服务器              ✅ 运行中 (http://localhost:9090)"
+    echo -e "   4. 自动更新检查                ✅ 运行中"
     echo ""
     echo -e "${CYAN}💡 管理命令:${NC}"
     echo -e "   - 隧道状态: ${GREEN}./scripts/status.sh${NC}"
