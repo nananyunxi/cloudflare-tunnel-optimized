@@ -282,6 +282,60 @@ cloudflared tunnel run my-tunnel
 
 ---
 
+## 🔧 管理命令
+
+### 状态检查
+
+查看隧道运行状态、版本、内存使用等信息：
+
+```bash
+# macOS / Linux
+./scripts/status.sh
+
+# Windows
+.\scripts\status.bat
+```
+
+**输出示例：**
+```
+【程序状态】
+  cloudflared: 已安装
+  版本: cloudflared version 2026.3.0
+
+【隧道状态】
+  状态: 运行中
+  PID: 12345
+  运行时间: 1:23:45
+  内存使用: 45.2 MB
+
+【隧道信息】
+  公网地址: https://xxx.trycloudflare.com
+```
+
+### 更新检查
+
+检查并更新 cloudflared 到最新版本：
+
+```bash
+# macOS / Linux
+./scripts/update.sh
+
+# Windows
+.\scripts\update.bat
+```
+
+### 停止隧道
+
+```bash
+# macOS / Linux
+./scripts/stop.sh
+
+# Windows
+.\scripts\stop.bat
+```
+
+---
+
 ### 模式三：自定义域名（推荐）
 
 **绑定自己的域名，专业可靠**
@@ -434,7 +488,11 @@ cloudflare-tunnel-optimized/
     ├── start-named.sh       # macOS/Linux 命名隧道启动
     ├── start-named.bat      # Windows 命名隧道启动
     ├── stop.sh              # macOS/Linux 停止脚本
-    └── stop.bat             # Windows 停止脚本
+    ├── stop.bat             # Windows 停止脚本
+    ├── status.sh            # macOS/Linux 状态检查
+    ├── status.bat           # Windows 状态检查
+    ├── update.sh            # macOS/Linux 更新检查
+    └── update.bat           # Windows 更新检查
 ```
 
 ---
