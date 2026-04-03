@@ -11,13 +11,13 @@
 本项目是对 Cloudflare Tunnel 官方工具 `cloudflared` 的**优化封装**，提供：
 
 - **一键安装启动脚本**：跨平台支持（macOS/Linux/Windows）
-- **智能连接优化**：IPv4/IPv6 自动兼容、自动重连、故障转移
+- **自动重连守护进程**：断线自动重启，实时通知新链接
+- **Web 监控界面**：状态查看、远程重启、链接复制
 - **简化的使用体验**：交互式引导，无需记忆复杂命令
-- **完整的配置示例**：开箱即用的配置模板
 
 > **为什么选择本项目？**
 > 
-> Cloudflare Tunnel 官方工具功能强大但使用门槛较高。本项目通过脚本封装和优化配置，让用户可以用最简单的方式享受企业级内网穿透服务。
+> 官方工具功能强大但使用门槛较高，且没有自动重连和监控功能。本项目添加了这些真正有用的优化。
 
 ---
 
@@ -27,10 +27,9 @@
 |------|------|
 | **完全免费** | 无时长限制、无流量限制、无限隧道数量 |
 | **自定义域名** | 支持绑定自己的域名，自动配置 HTTPS |
-| **IPv4/IPv6 智能兼容** | 自动检测并选择最优连接方式 |
-| **连接稳定性优化** | 自动重连、心跳保活、故障转移 |
-| **一键安装启动** | 跨平台脚本，自动检测安装依赖 |
-| **多种运行模式** | 快速隧道 / 命名隧道 / 自定义域名 |
+| **自动重连** | 断线自动检测并重启，通知用户新链接 |
+| **Web 监控** | 浏览器查看状态、重启、停止、复制链接 |
+| **一键启动** | 跨平台脚本，自动检测安装依赖 |
 
 ---
 
@@ -55,34 +54,49 @@
 - ✅ 交互式引导输入配置
 - ✅ 后台运行，关闭终端不影响服务
 - ✅ 显示隧道 URL 和连接信息
-- ✅ 支持停止/重启隧道
-- ✅ 进度显示和友好的错误提示
 
-### 优化二：IPv4/IPv6 智能兼容
+### 优化二：自动重连守护进程 🚀 新增
 
-**问题背景：** 
-部分网络环境下，`localhost` 默认解析到 IPv6 地址（`::1`），但本地服务可能只监听 IPv4（`127.0.0.1`），导致连接失败。
+**官方没有的功能！** 当隧道意外断开时，自动检测并重新连接。
 
-**优化方案：**
 ```bash
-# 脚本自动使用 --edge-ip-version auto 参数
-cloudflared tunnel --url http://localhost:8080 --edge-ip-version auto
+# 启动自动重连守护进程
+./scripts/auto-reconnect.sh [端口]
 ```
 
-这会自动检测网络环境，选择最优的 IP 版本连接 Cloudflare 边缘节点。
+**功能：**
+- 每 30 秒检查隧道状态
+- 检测到断开后自动重启
+- **重启后在终端显示新的隧道链接**
+- 保存最新链接到文件供其他程序读取
 
-### 优化三：连接稳定性增强
+### 优化三：Web 监控界面 🚀 新增
 
-**优化参数：**
+**官方没有的功能！** 通过浏览器监控隧道状态。
 
-| 参数 | 默认值 | 说明 |
-|------|--------|------|
-| `--retries` | 5 | 连接失败重试次数 |
-| `--edge-ip-version` | auto | 自动选择 IPv4/IPv6 |
-| `connectTimeout` | 30s | 连接超时时间 |
-| `tcpKeepAlive` | 30s | TCP 心跳保活间隔 |
-| `keepAliveConnections` | 100 | 连接池大小 |
-| `http2Origin` | true | 启用 HTTP/2 提升性能 |
+```bash
+# 启动 Web 监控服务器
+python3 scripts/monitor.py
+# 或使用 bash 版本
+./scripts/monitor.sh
+```
+
+**功能：**
+- 实时显示 PID、运行时间、内存使用
+- **一键复制隧道链接**
+- 远程重启/停止隧道
+- 查看最近日志
+- 自动刷新（5秒）
+
+### 优化四：状态检查与更新
+
+```bash
+# 查看隧道状态
+./scripts/status.sh
+
+# 检查更新
+./scripts/update.sh
+```
 
 **配置文件优化示例：**
 ```yaml
@@ -483,16 +497,19 @@ cloudflare-tunnel-optimized/
 ├── config.example.yml        # 配置文件示例
 ├── .gitignore               # Git 忽略文件
 └── scripts/
-    ├── start-quick.sh       # macOS/Linux 快速隧道启动
+    ├── start-quick.sh       # 快速隧道启动
     ├── start-quick.bat      # Windows 快速隧道启动
-    ├── start-named.sh       # macOS/Linux 命名隧道启动
+    ├── start-named.sh       # 命名隧道启动
     ├── start-named.bat      # Windows 命名隧道启动
-    ├── stop.sh              # macOS/Linux 停止脚本
-    ├── stop.bat             # Windows 停止脚本
-    ├── status.sh            # macOS/Linux 状态检查
+    ├── stop.sh              # 停止隧道
+    ├── stop.bat             # Windows 停止
+    ├── status.sh            # 状态检查
     ├── status.bat           # Windows 状态检查
-    ├── update.sh            # macOS/Linux 更新检查
-    └── update.bat           # Windows 更新检查
+    ├── update.sh            # 更新检查
+    ├── update.bat           # Windows 更新检查
+    ├── auto-reconnect.sh    # 自动重连守护进程 🚀
+    ├── monitor.py           # Web 监控服务器 🚀
+    └── monitor.sh           # Web 监控 (Bash版) 🚀
 ```
 
 ---
