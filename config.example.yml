@@ -1,38 +1,84 @@
 # Cloudflare Tunnel 配置文件示例
 # 将此文件复制到 ~/.cloudflared/config.yml 并根据需要修改
 
+# ============================================
+# 隧道基本配置
+# ============================================
+
 # 隧道名称或 ID
 tunnel: your-tunnel-name
 
 # 凭证文件路径 (创建隧道后自动生成)
 credentials-file: ~/.cloudflared/your-tunnel-id.json
 
-# 入口规则配置
+# ============================================
+# 服务入口规则 (ingress)
+# ============================================
+# 规则从上到下匹配，最后一个规则必须是默认规则
+
 ingress:
-  # Web 应用
+  # ----- Web 应用 -----
   - hostname: web.yourdomain.com
     service: http://localhost:8080
     originRequest:
-      # 连接超时时间
+      # 连接超时时间 (默认 30s)
       connectTimeout: 30s
-      # TCP 保活时间
+      # TCP 保活时间 (默认 30s)
       tcpKeepAlive: 30s
-      # 禁用 TLS 验证 (开发环境)
-      noTLSVerify: true
-      # HTTP/2 支持
+      # TLS 握手超时 (默认 10s)
+      tlsTimeout: 10s
+      # 保活连接池大小 (默认 100)
+      keepAliveConnections: 100
+      # 保活超时时间 (默认 90s)
+      keepAliveTimeout: 90s
+      # 启用 HTTP/2 (提升性能)
       http2Origin: true
+      # 禁用 TLS 验证 (仅开发环境使用，生产环境建议关闭)
+      noTLSVerify: false
 
-  # API 服务
+  # ----- API 服务 -----
   - hostname: api.yourdomain.com
     service: http://localhost:3000
 
-  # SSH 访问 (需要配置 Cloudflare Access)
+  # ----- 静态文件服务 -----
+  - hostname: static.yourdomain.com
+    service: http://localhost:8000
+
+  # ----- SSH 访问 -----
+  # 需要配置 Cloudflare Access 进行身份验证
   - hostname: ssh.yourdomain.com
     service: ssh://localhost:22
 
-  # 远程桌面 (需要配置 Cloudflare Access)
+  # ----- 远程桌面 (RDP) -----
+  # 需要配置 Cloudflare Access 进行身份验证
   - hostname: rdp.yourdomain.com
     service: rdp://localhost:3389
 
-  # 默认规则 (必须放在最后)
+  # ----- 数据库访问 (通过 Cloudflare Access) -----
+  # 支持 MySQL、PostgreSQL、Redis 等 TCP 服务
+  - hostname: db.yourdomain.com
+    service: tcp://localhost:3306
+
+  # ----- 默认规则 (必须放在最后) -----
+  # 未匹配的请求返回 404
   - service: http_status:404
+
+# ============================================
+# 高级配置 (可选)
+# ============================================
+
+# 日志级别: debug, info, warn, error, fatal
+# loglevel: info
+
+# 指标服务端口 (用于监控)
+# metrics: localhost:20241
+
+# 连接重试次数
+# retries: 5
+
+# 区域选择 (默认全球)
+# region: us
+
+# 协议选择: quic, h2mux, http2
+# h2mux 性能更好，但可能不兼容某些网络环境
+# protocol: h2mux

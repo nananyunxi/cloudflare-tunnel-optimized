@@ -21,6 +21,7 @@ NC='\033[0m' # No Color
 DEFAULT_PORT=8080
 LOG_DIR="$HOME/.cloudflared/logs"
 PID_FILE="$HOME/.cloudflared/tunnel.pid"
+METRICS_PORT=""  # 自动分配
 
 # 打印横幅
 print_banner() {
@@ -43,6 +44,22 @@ detect_os() {
     fi
 }
 
+# 检测系统架构
+detect_arch() {
+    local arch=$(uname -m)
+    case $arch in
+        x86_64|amd64)
+            echo "amd64"
+            ;;
+        aarch64|arm64)
+            echo "arm64"
+            ;;
+        *)
+            echo "amd64"  # 默认
+            ;;
+    esac
+}
+
 # 检查 cloudflared 是否已安装
 check_cloudflared() {
     if command -v cloudflared &> /dev/null; then
@@ -55,6 +72,7 @@ check_cloudflared() {
 # 安装 cloudflared
 install_cloudflared() {
     local os=$(detect_os)
+    local arch=$(detect_arch)
     
     echo -e "${YELLOW}正在安装 cloudflared...${NC}"
     
@@ -64,7 +82,8 @@ install_cloudflared() {
                 brew install cloudflared
             else
                 echo -e "${YELLOW}Homebrew 未安装，使用二进制安装...${NC}"
-                curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-amd64 -o /tmp/cloudflared
+                local download_url="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-${arch}"
+                curl -L "$download_url" -o /tmp/cloudflared
                 chmod +x /tmp/cloudflared
                 sudo mv /tmp/cloudflared /usr/local/bin/
             fi
@@ -72,17 +91,42 @@ install_cloudflared() {
         linux)
             if command -v apt-get &> /dev/null; then
                 # Debian/Ubuntu
-                curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb -o /tmp/cloudflared.deb
-                sudo dpkg -i /tmp/cloudflared.deb || sudo apt-get install -f -y
-                rm -f /tmp/cloudflared.deb
+                if [[ "$arch" == "arm64" ]]; then
+                    local download_url="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64"
+                else
+                    local download_url="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb"
+                fi
+                
+                if [[ "$download_url" == *.deb ]]; then
+                    curl -L "$download_url" -o /tmp/cloudflared.deb
+                    sudo dpkg -i /tmp/cloudflared.deb || sudo apt-get install -f -y
+                    rm -f /tmp/cloudflared.deb
+                else
+                    curl -L "$download_url" -o /tmp/cloudflared
+                    chmod +x /tmp/cloudflared
+                    sudo mv /tmp/cloudflared /usr/local/bin/
+                fi
             elif command -v yum &> /dev/null; then
-                # RHEL/CentOS
-                curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.rpm -o /tmp/cloudflared.rpm
-                sudo rpm -i /tmp/cloudflared.rpm
-                rm -f /tmp/cloudflared.rpm
+                # RHEL/CentOS/Fedora
+                if [[ "$arch" == "arm64" ]]; then
+                    local download_url="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64"
+                else
+                    local download_url="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.rpm"
+                fi
+                
+                if [[ "$download_url" == *.rpm ]]; then
+                    curl -L "$download_url" -o /tmp/cloudflared.rpm
+                    sudo rpm -i /tmp/cloudflared.rpm
+                    rm -f /tmp/cloudflared.rpm
+                else
+                    curl -L "$download_url" -o /tmp/cloudflared
+                    chmod +x /tmp/cloudflared
+                    sudo mv /tmp/cloudflared /usr/local/bin/
+                fi
             else
                 # 通用二进制安装
-                curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /tmp/cloudflared
+                local download_url="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${arch}"
+                curl -L "$download_url" -o /tmp/cloudflared
                 chmod +x /tmp/cloudflared
                 sudo mv /tmp/cloudflared /usr/local/bin/
             fi
@@ -94,7 +138,13 @@ install_cloudflared() {
             ;;
     esac
     
-    echo -e "${GREEN}✓ cloudflared 安装完成${NC}"
+    # 验证安装
+    if check_cloudflared; then
+        echo -e "${GREEN}✓ cloudflared 安装完成${NC}"
+    else
+        echo -e "${RED}✗ cloudflared 安装失败${NC}"
+        exit 1
+    fi
 }
 
 # 检查端口是否被占用
@@ -116,6 +166,12 @@ get_port() {
         echo -e "${CYAN}请输入要暴露的本地端口 [默认: $DEFAULT_PORT]:${NC} "
         read -r input_port
         port=${input_port:-$DEFAULT_PORT}
+    fi
+    
+    # 验证端口范围
+    if ! [[ "$port" =~ ^[0-9]+$ ]] || [[ "$port" -lt 1 ]] || [[ "$port" -gt 65535 ]]; then
+        echo -e "${RED}无效的端口号: $port${NC}"
+        exit 1
     fi
     
     echo "$port"
@@ -143,7 +199,7 @@ start_quick_tunnel() {
         echo -e "${GREEN}✓ 本地端口 $port 已有服务在监听${NC}"
     fi
     
-    # 创建日志目录
+    # 创建必要的目录
     mkdir -p "$LOG_DIR"
     mkdir -p "$HOME/.cloudflared"
     
@@ -173,6 +229,10 @@ start_quick_tunnel() {
     echo -e "${BLUE}══════════════════════════════════════════════════════${NC}"
     
     # 启动隧道（后台运行）
+    # 优化参数说明：
+    # --edge-ip-version auto: 自动选择 IPv4/IPv6
+    # --retries 5: 连接失败时重试 5 次
+    # --loglevel info: 记录信息级别日志
     nohup cloudflared tunnel \
         --url "http://localhost:$port" \
         --edge-ip-version auto \
@@ -200,7 +260,11 @@ start_quick_tunnel() {
         fi
         sleep 1
         ((attempt++))
+        
+        # 显示进度
+        echo -ne "${YELLOW}等待中... $((attempt * 100 / max_attempts))%\r${NC}"
     done
+    echo ""
     
     echo ""
     echo -e "${BLUE}══════════════════════════════════════════════════════${NC}"
@@ -218,12 +282,11 @@ start_quick_tunnel() {
     echo ""
     echo -e "${CYAN}📁 日志文件:${NC}"
     echo -e "   $LOG_DIR/tunnel.log"
-    echo -e "   $LOG_DIR/tunnel-output.log"
     echo ""
     echo -e "${CYAN}💡 提示:${NC}"
     echo -e "   - 隧道正在后台运行，关闭此窗口不影响服务"
     echo -e "   - 使用 ${GREEN}./stop.sh${NC} 停止隧道"
-    echo -e "   - 使用 ${GREEN}cloudflared tunnel --url http://localhost:$port${NC} 前台运行查看实时日志"
+    echo -e "   - 使用 ${GREEN}tail -f $LOG_DIR/tunnel.log${NC} 查看实时日志"
     echo ""
     echo -e "${BLUE}══════════════════════════════════════════════════════${NC}"
 }
@@ -237,7 +300,7 @@ main() {
         echo -e "${YELLOW}cloudflared 未安装${NC}"
         install_cloudflared
     else
-        echo -e "${GREEN}✓ cloudflared 已安装: $(cloudflared --version | head -1)${NC}"
+        echo -e "${GREEN}✓ cloudflared 已安装: $(cloudflared --version 2>&1 | head -1)${NC}"
     fi
     
     # 获取端口

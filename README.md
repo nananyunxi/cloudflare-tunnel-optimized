@@ -50,12 +50,13 @@
 | `stop.bat` | 停止隧道服务 | Windows |
 
 **脚本功能：**
-- ✅ 自动检测系统架构
+- ✅ 自动检测系统架构 (amd64/arm64)
 - ✅ 自动安装 cloudflared（如未安装）
 - ✅ 交互式引导输入配置
 - ✅ 后台运行，关闭终端不影响服务
 - ✅ 显示隧道 URL 和连接信息
 - ✅ 支持停止/重启隧道
+- ✅ 进度显示和友好的错误提示
 
 ### 优化二：IPv4/IPv6 智能兼容
 
@@ -80,6 +81,8 @@ cloudflared tunnel --url http://localhost:8080 --edge-ip-version auto
 | `--edge-ip-version` | auto | 自动选择 IPv4/IPv6 |
 | `connectTimeout` | 30s | 连接超时时间 |
 | `tcpKeepAlive` | 30s | TCP 心跳保活间隔 |
+| `keepAliveConnections` | 100 | 连接池大小 |
+| `http2Origin` | true | 启用 HTTP/2 提升性能 |
 
 **配置文件优化示例：**
 ```yaml
