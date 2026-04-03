@@ -304,6 +304,34 @@ main() {
         install_cloudflared
     else
         echo -e "${GREEN}✓ cloudflared 已安装: $(cloudflared --version 2>&1 | head -1)${NC}"
+        
+        # 启动前检查更新
+        echo -e "${CYAN}检查更新中...${NC}"
+        local current_ver=$(cloudflared --version 2>&1 | grep -oP 'cloudflared version \K[\d.]+' || cloudflared --version 2>&1 | awk '{print $NF}')
+        local latest_ver=$(curl -s "https://api.github.com/repos/cloudflare/cloudflared/releases/latest" 2>/dev/null | grep '"tag_name"' | sed 's/.*"v\?//' | sed 's/".*//')
+        
+        if [[ -n "$latest_ver" ]] && [[ "$current_ver" != "$latest_ver" ]]; then
+            echo -e "${YELLOW}发现新版本: $latest_ver (当前: $current_ver)${NC}"
+            echo -e "${CYAN}正在更新...${NC}"
+            
+            # 执行更新
+            local arch=$(uname -m)
+            case $arch in
+                x86_64|amd64) arch="amd64" ;;
+                aarch64|arm64) arch="arm64" ;;
+            esac
+            
+            OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+            if [[ "$OS" == "linux" ]] && command -v apt-get &> /dev/null; then
+                curl -L "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${arch}.deb" -o /tmp/cloudflared.deb
+                sudo dpkg -i /tmp/cloudflared.deb || sudo apt-get install -f -y
+                rm -f /tmp/cloudflared.deb
+            fi
+            
+            echo -e "${GREEN}✓ 更新完成!${NC}"
+        else
+            echo -e "${GREEN}✓ 已是最新版本${NC}"
+        fi
     fi
     
     # 获取端口
@@ -322,11 +350,6 @@ main() {
     nohup python3 "$SCRIPT_DIR/monitor.py" > "$LOG_DIR/monitor.log" 2>&1 &
     sleep 2
     
-    # 启动自动更新检查
-    echo -e "${CYAN}正在启动自动更新检查...${NC}"
-    nohup "$SCRIPT_DIR/auto-update.sh" > "$LOG_DIR/update.log" 2>&1 &
-    sleep 2
-    
     echo ""
     echo -e "${BLUE}══════════════════════════════════════════════════════${NC}"
     echo -e "${GREEN}✅ 所有服务已启动！${NC}"
@@ -336,7 +359,6 @@ main() {
     echo -e "   1. Cloudflare Tunnel 隧道      ✅ 运行中"
     echo -e "   2. 自动重连守护进程            ✅ 运行中"
     echo -e "   3. Web 监控服务器              ✅ 运行中 (http://localhost:9090)"
-    echo -e "   4. 自动更新检查                ✅ 运行中"
     echo ""
     echo -e "${CYAN}💡 管理命令:${NC}"
     echo -e "   - 隧道状态: ${GREEN}./scripts/status.sh${NC}"
