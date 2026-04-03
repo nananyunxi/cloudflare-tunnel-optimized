@@ -25,10 +25,6 @@ def get_status():
         try:
             with open(PID_FILE, 'r') as f:
                 pid = int(f.read().strip())
-    if os.path.exists(PID_FILE):
-        try:
-            with open(PID_FILE, 'r') as f:
-                pid = int(f.read().strip())
             # 检查进程是否存在
             try:
                 os.kill(pid, 0)
