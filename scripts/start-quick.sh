@@ -23,6 +23,9 @@ LOG_DIR="$HOME/.cloudflared/logs"
 PID_FILE="$HOME/.cloudflared/tunnel.pid"
 METRICS_PORT=""  # 自动分配
 
+# 获取脚本所在目录
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 # 打印横幅
 print_banner() {
     echo -e "${PURPLE}"
@@ -308,7 +311,56 @@ main() {
     
     # 启动隧道
     start_quick_tunnel "$port"
+    
+    # 启动自动重连守护进程
+    echo -e "${CYAN}正在启动自动重连守护进程...${NC}"
+    nohup "$0" auto-reconnect "$port" > "$LOG_DIR/reconnect.log" 2>&1 &
+    sleep 2
+    
+    # 启动 Web 监控服务器
+    echo -e "${CYAN}正在启动 Web 监控服务器...${NC}"
+    nohup python3 "$SCRIPT_DIR/monitor.py" > "$LOG_DIR/monitor.log" 2>&1 &
+    sleep 2
+    
+    echo ""
+    echo -e "${BLUE}══════════════════════════════════════════════════════${NC}"
+    echo -e "${GREEN}✅ 所有服务已启动！${NC}"
+    echo -e "${BLUE}══════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "${CYAN}📌 服务列表:${NC}"
+    echo -e "   1. Cloudflare Tunnel 隧道      ✅ 运行中"
+    echo -e "   2. 自动重连守护进程            ✅ 运行中"
+    echo -e "   3. Web 监控服务器              ✅ 运行中 (http://localhost:9090)"
+    echo ""
+    echo -e "${CYAN}💡 管理命令:${NC}"
+    echo -e "   - 隧道状态: ${GREEN}./scripts/status.sh${NC}"
+    echo -e "   - Web 监控: ${GREEN}http://localhost:9090${NC}"
+    echo -e "   - 停止服务: ${GREEN}./scripts/stop.sh${NC}"
+    echo ""
+}
+
+# 自动重连模式
+auto_reconnect_mode() {
+    local port=$1
+    local CHECK_INTERVAL=30
+    
+    while true; do
+        sleep $CHECK_INTERVAL
+        
+        # 检查隧道进程
+        if [[ -f "$PID_FILE" ]]; then
+            local pid=$(cat "$PID_FILE")
+            if ! kill -0 "$pid" 2>/dev/null; then
+                echo "$(date): 隧道进程已停止，尝试重启..." >> "$LOG_DIR/reconnect.log"
+                start_quick_tunnel "$port"
+            fi
+        fi
+    done
 }
 
 # 运行
-main "$@"
+if [[ "$1" == "auto-reconnect" ]]; then
+    auto_reconnect_mode "$2"
+else
+    main "$@"
+fi
